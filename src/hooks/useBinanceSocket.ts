@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export interface TickerData {
   symbol: string;
@@ -92,7 +92,7 @@ export const useBinanceSocket = (symbols: string[]) => {
         return newState;
       });
     }
-  }, [symbols, isConnected]);
+  }, [symbols, isConnected, tickers]);
 
   return { tickers, isConnected };
 };
