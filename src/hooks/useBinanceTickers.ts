@@ -34,13 +34,13 @@ export const useBinanceTickers = (symbols: string[]) => {
     const fetchTickers = async () => {
       try {
         const symbolsParam = symbolsString;
-        // Using the 24hr Ticker API as it provides price change percentage
-        // Removed { mode: "no-cors" } as it makes the response body opaque
-        const response = await fetch(
-          `https://api.binance.com/api/v3/ticker/24hr?symbols=${symbolsParam}`
-        );
+        // Fetch from our own proxy API route
+        const response = await fetch(`/api/ticker?symbols=${symbolsParam}`);
         if (!response.ok) {
-          throw new Error(`Error fetching data: ${response.statusText}`);
+          const errorData = await response.json();
+          throw new Error(
+            errorData.message || `Error fetching data: ${response.statusText}`
+          );
         }
         const data: BinanceRawTicker[] = await response.json();
 
