@@ -4,7 +4,7 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "cdn.jsdelivr.net",
+        hostname: "cryptoicons.co",
       },
     ],
   },

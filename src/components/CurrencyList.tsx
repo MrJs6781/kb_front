@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useWatchlist } from "@/context/WatchlistContext";
-import Image from "next/image";
+import CryptoIcon from "./CryptoIcon"; // Using the new robust component
 
 // A predefined list of popular currency pairs
 const ALL_CURRENCIES = [
@@ -19,12 +19,10 @@ const ALL_CURRENCIES = [
   "MATICUSDT",
   "DOTUSDT",
   "AVAXUSDT",
+  "SHIBUSDT",
+  "LINKUSDT",
+  "UNIUSDT", // Added more coins
 ];
-
-const getIconSymbol = (pair: string) => {
-  // Extracts the base currency (e.g., BTC from BTCUSDT)
-  return pair.replace(/USDT$/, "").toLowerCase();
-};
 
 const CurrencyList = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -50,20 +48,13 @@ const CurrencyList = () => {
         {filteredCurrencies.length > 0 ? (
           filteredCurrencies.map((currency) => {
             const isInWatchlist = isSymbolInWatchlist(currency);
-            const iconSymbol = getIconSymbol(currency);
             return (
               <div
                 key={currency}
                 className="flex items-center justify-between p-4 bg-white rounded-lg shadow-sm hover:shadow-md hover:-translate-y-px transition-all duration-200"
               >
                 <div className="flex items-center gap-3">
-                  <Image
-                    src={`https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@main/svg/color/${iconSymbol}.svg`}
-                    alt={`${currency} icon`}
-                    width={28}
-                    height={28}
-                    unoptimized // Good for SVGs to prevent quality loss
-                  />
+                  <CryptoIcon symbol={currency} width={28} height={28} />
                   <span className="font-bold text-slate-700">{currency}</span>
                 </div>
                 <div className="flex items-center space-x-3 space-x-reverse gap-3">

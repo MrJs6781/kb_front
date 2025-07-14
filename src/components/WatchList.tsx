@@ -4,11 +4,7 @@ import React, { useEffect, useRef } from "react";
 import { useWatchlist } from "@/context/WatchlistContext";
 import { useBinanceSocket } from "@/hooks/useBinanceSocket"; // Replaced with the new hook
 import { FiTrash2 } from "react-icons/fi";
-import Image from "next/image";
-
-const getIconSymbol = (pair: string) => {
-  return pair.replace(/USDT$/, "").toLowerCase();
-};
+import CryptoIcon from "./CryptoIcon"; // Using the new robust component
 
 const WatchList = () => {
   const { watchlist, removeFromWatchlist } = useWatchlist();
@@ -65,7 +61,6 @@ const WatchList = () => {
               data && parseFloat(data.priceChangePercent) >= 0
                 ? "text-success"
                 : "text-danger";
-            const iconSymbol = getIconSymbol(symbol);
 
             return (
               <div
@@ -73,13 +68,7 @@ const WatchList = () => {
                 className="flex items-center justify-between p-3 bg-slate-50 rounded-lg"
               >
                 <div className="flex-1 flex items-center gap-3">
-                  <Image
-                    src={`https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@main/svg/color/${iconSymbol}.svg`}
-                    alt={`${symbol} icon`}
-                    width={24}
-                    height={24}
-                    unoptimized
-                  />
+                  <CryptoIcon symbol={symbol} width={24} height={24} />
                   <span className="font-bold text-slate-700">{symbol}</span>
                 </div>
                 {data ? (
