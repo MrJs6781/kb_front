@@ -1,16 +1,51 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Header from "@/components/Header";
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { FiRefreshCw } from "react-icons/fi";
+
+interface Trade {
+  id: number;
+  price: string;
+  qty: string;
+  time: number;
+  isBuyerMaker: boolean;
+}
 
 const TradePage = () => {
-  const router = useRouter();
   const params = useParams();
   const symbol = Array.isArray(params.symbol)
     ? params.symbol[0]
     : params.symbol;
+
+  const [trades, setTrades] = useState<Trade[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchTrades = useCallback(async () => {
+    if (!symbol) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/trades?symbol=${symbol}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to fetch trades");
+      }
+      const data: Trade[] = await response.json();
+      setTrades(data.reverse()); // Show latest trades first
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [symbol]);
+
+  useEffect(() => {
+    fetchTrades();
+  }, [fetchTrades]);
 
   return (
     <div>
@@ -24,10 +59,12 @@ const TradePage = () => {
             </h2>
             <div className="flex gap-2">
               <button
-                onClick={() => router.refresh()}
-                className="px-4 py-2 text-sm font-semibold text-primary bg-blue-100 rounded-md hover:bg-blue-200 transition-colors w-full sm:w-auto"
+                onClick={fetchTrades}
+                disabled={loading}
+                className="px-4 py-2 text-sm font-semibold text-primary bg-blue-100 rounded-md hover:bg-blue-200 transition-colors flex items-center gap-2 disabled:opacity-50"
               >
-                به‌روزرسانی
+                <FiRefreshCw className={loading ? "animate-spin" : ""} />
+                {loading ? "در حال بروزرسانی..." : "به‌روزرسانی"}
               </button>
               <Link
                 href="/"
@@ -38,7 +75,6 @@ const TradePage = () => {
             </div>
           </div>
 
-          {/* Trades Table */}
           <div className="overflow-x-auto">
             <table className="min-w-full text-right align-middle">
               <thead className="bg-slate-50">
@@ -55,20 +91,38 @@ const TradePage = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {/* Placeholder Row */}
-                <tr className="text-center">
-                  <td className="p-4 text-sm text-slate-500" colSpan={3}>
-                    در حال بارگذاری لیست معاملات...
-                  </td>
-                </tr>
-                {/* Example of a filled row (for styling reference) */}
-                {/* 
-                <tr className='hover:bg-slate-50'>
-                   <td className='p-3 text-sm text-slate-700 whitespace-nowrap'>1403/05/01 12:34:56</td>
-                   <td className='p-3 text-sm text-success whitespace-nowrap'>65,123.45</td>
-                   <td className='p-3 text-sm text-slate-700 whitespace-nowrap'>0.0012</td>
-                </tr>
-                 */}
+                {loading && (
+                  <tr>
+                    <td className="p-4 text-center text-slate-500" colSpan={3}>
+                      در حال بارگذاری...
+                    </td>
+                  </tr>
+                )}
+                {error && (
+                  <tr>
+                    <td className="p-4 text-center text-danger" colSpan={3}>
+                      خطا: {error}
+                    </td>
+                  </tr>
+                )}
+                {!loading &&
+                  trades.map((trade) => (
+                    <tr key={trade.id} className="hover:bg-slate-50">
+                      <td className="p-3 text-sm text-slate-700 whitespace-nowrap">
+                        {new Date(trade.time).toLocaleTimeString("fa-IR")}
+                      </td>
+                      <td
+                        className={`p-3 text-sm font-mono whitespace-nowrap ${
+                          trade.isBuyerMaker ? "text-danger" : "text-success"
+                        }`}
+                      >
+                        {parseFloat(trade.price).toFixed(2)}
+                      </td>
+                      <td className="p-3 text-sm text-slate-700 whitespace-nowrap">
+                        {parseFloat(trade.qty).toFixed(5)}
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>

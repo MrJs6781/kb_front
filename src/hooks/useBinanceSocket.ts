@@ -8,45 +8,50 @@ export interface TickerData {
   priceChangePercent: string;
 }
 
-// Type for the raw data from Binance WebSocket stream
 interface BinanceSocketData {
-  e: string; // Event type
-  E: number; // Event time
   s: string; // Symbol
-  c: string; // Close price (last price)
+  c: string; // Close price
   P: string; // Price change percent
-  // ... other fields are available but not used
 }
+
+const WEBSOCKET_URL = "wss://stream.binance.com:9443/ws";
+let subscriptionIdCounter = 1;
 
 export const useBinanceSocket = (symbols: string[]) => {
   const [tickers, setTickers] = useState<Record<string, TickerData>>({});
   const [isConnected, setIsConnected] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
+  const subscribedSymbolsRef = useRef<Set<string>>(new Set());
+  const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    // If there are no symbols, close any existing connection and clear tickers
-    if (symbols.length === 0) {
-      if (socketRef.current) {
-        socketRef.current.close();
-        socketRef.current = null;
-      }
-      setTickers({});
+  const connect = () => {
+    if (socketRef.current) {
+      // A connection is already open or being established
       return;
     }
 
-    const streams = symbols.map((s) => `${s.toLowerCase()}@ticker`).join("/");
-    const ws = new WebSocket(
-      `wss://stream.binance.com:9443/stream?streams=${streams}`
-    );
+    const ws = new WebSocket(WEBSOCKET_URL);
+    socketRef.current = ws;
 
     ws.onopen = () => {
       setIsConnected(true);
+      // After connecting, subscribe to the current symbols
+      updateSubscriptions(symbols);
+      // Start sending pongs to keep connection alive
+      if (heartbeatIntervalRef.current)
+        clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ method: "PONG" }));
+        }
+      }, 60 * 1000); // Send a pong every minute
     };
 
     ws.onmessage = (event) => {
       const message = JSON.parse(event.data);
-      if (message.data) {
-        const data: BinanceSocketData = message.data;
+      // Ticker data from stream has a 's' property (symbol)
+      if (message && message.s) {
+        const data: BinanceSocketData = message;
         setTickers((prevTickers) => ({
           ...prevTickers,
           [data.s]: {
@@ -58,24 +63,80 @@ export const useBinanceSocket = (symbols: string[]) => {
       }
     };
 
-    ws.onclose = () => {
-      setIsConnected(false);
-    };
-
     ws.onerror = (error) => {
       console.error("WebSocket Error:", error);
       setIsConnected(false);
     };
 
-    socketRef.current = ws;
+    ws.onclose = () => {
+      setIsConnected(false);
+      subscribedSymbolsRef.current.clear();
+      // Cleanup interval on close
+      if (heartbeatIntervalRef.current)
+        clearInterval(heartbeatIntervalRef.current);
+      // Optional: implement reconnection logic here
+      console.log("WebSocket disconnected. Attempting to reconnect...");
+      socketRef.current = null; // Clear the ref to allow reconnection
+      setTimeout(connect, 5000); // Reconnect after 5 seconds
+    };
+  };
 
-    // Cleanup function to close the socket when the component unmounts or symbols change
+  const updateSubscriptions = (currentSymbols: string[]) => {
+    const ws = socketRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    const currentSymbolsSet = new Set(currentSymbols);
+    const toUnsubscribe = [...subscribedSymbolsRef.current].filter(
+      (s) => !currentSymbolsSet.has(s)
+    );
+    const toSubscribe = [...currentSymbolsSet].filter(
+      (s) => !subscribedSymbolsRef.current.has(s)
+    );
+
+    if (toUnsubscribe.length > 0) {
+      const params = toUnsubscribe.map((s) => `${s.toLowerCase()}@ticker`);
+      ws.send(
+        JSON.stringify({
+          method: "UNSUBSCRIBE",
+          params,
+          id: subscriptionIdCounter++,
+        })
+      );
+      toUnsubscribe.forEach((s) => subscribedSymbolsRef.current.delete(s));
+    }
+
+    if (toSubscribe.length > 0) {
+      const params = toSubscribe.map((s) => `${s.toLowerCase()}@ticker`);
+      ws.send(
+        JSON.stringify({
+          method: "SUBSCRIBE",
+          params,
+          id: subscriptionIdCounter++,
+        })
+      );
+      toSubscribe.forEach((s) => subscribedSymbolsRef.current.add(s));
+    }
+  };
+
+  useEffect(() => {
+    if (!socketRef.current) {
+      connect();
+    } else {
+      updateSubscriptions(symbols);
+    }
+
+    // Cleanup on component unmount
     return () => {
-      if (ws) {
-        ws.close();
+      if (socketRef.current) {
+        socketRef.current.close();
+      }
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
       }
     };
-  }, [JSON.stringify(symbols)]); // Re-connect if the list of symbols changes
+  }, [symbols]);
 
   return { tickers, isConnected };
 };
