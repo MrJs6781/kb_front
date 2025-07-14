@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { useWatchlist } from "@/context/WatchlistContext";
 import { useBinanceTickers } from "@/hooks/useBinanceTickers";
 import { FiTrash2 } from "react-icons/fi";
