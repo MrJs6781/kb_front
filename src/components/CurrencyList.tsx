@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useWatchlist } from "@/context/WatchlistContext";
 import CryptoIcon from "./CryptoIcon";
-import { FiCheckCircle } from "react-icons/fi"; // آیکون برای نشان دادن اضافه شدن
+import { FiCheckCircle } from "react-icons/fi";
 
 const ALL_CURRENCIES = [
   "BTCUSDT",
@@ -45,7 +45,6 @@ const CurrencyList = () => {
         />
       </div>
 
-      {/* استفاده از گرید برای نمایش کارتی */}
       <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4">
         {filteredCurrencies.length > 0 ? (
           filteredCurrencies.map((currency) => {
@@ -55,7 +54,6 @@ const CurrencyList = () => {
                 key={currency}
                 className="relative bg-gradient-to-br from-white to-slate-50 rounded-xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col p-4"
               >
-                {/* نشانگر اضافه شدن به واچ‌لیست */}
                 {isInWatchlist && (
                   <div className="absolute top-3 right-3 text-success">
                     <FiCheckCircle size={20} />

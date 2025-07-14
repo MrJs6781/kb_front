@@ -1,98 +1,124 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 
 export interface TickerData {
-  symbol: string;
   lastPrice: string;
   priceChangePercent: string;
 }
 
-interface BinanceSocketData {
-  s: string; // Symbol
-  c: string; // Close price
-  P: string; // Price change percent
-}
+let socket: WebSocket | null = null;
+let lastTickers: Record<string, TickerData> = {};
+let isConnectedGlobal = false;
+const listeners = new Set<
+  (tickers: Record<string, TickerData>, isConnected: boolean) => void
+>();
+let currentSubscriptions = new Set<string>();
 
 const WEBSOCKET_URL = "wss://stream.binance.com:443/ws";
-let subscriptionIdCounter = 1;
 
-export const useBinanceSocket = (symbols: string[]) => {
-  const [tickers, setTickers] = useState<Record<string, TickerData>>({});
-  const [isConnected, setIsConnected] = useState(false);
-  const socketRef = useRef<WebSocket | null>(null);
+const connectSocket = () => {
+  if (
+    socket &&
+    (socket.readyState === WebSocket.OPEN ||
+      socket.readyState === WebSocket.CONNECTING)
+  ) {
+    return;
+  }
 
-  // Effect for Connection Management: Runs ONLY ONCE on mount/unmount.
+  socket = new WebSocket(WEBSOCKET_URL);
+
+  socket.onopen = () => {
+    isConnectedGlobal = true;
+    if (currentSubscriptions.size > 0) {
+      const params = Array.from(currentSubscriptions).map(
+        (s) => `${s.toLowerCase()}@ticker`
+      );
+      socket?.send(JSON.stringify({ method: "SUBSCRIBE", params, id: 1 }));
+    }
+    listeners.forEach((listener) => listener(lastTickers, isConnectedGlobal));
+  };
+
+  socket.onmessage = (event) => {
+    const message = JSON.parse(event.data);
+    if (message.e === "24hrTicker") {
+      lastTickers = {
+        ...lastTickers,
+        [message.s]: {
+          lastPrice: parseFloat(message.c).toFixed(2),
+          priceChangePercent: parseFloat(message.P).toFixed(2),
+        },
+      };
+      listeners.forEach((listener) => listener(lastTickers, isConnectedGlobal));
+    }
+  };
+
+  socket.onclose = () => {
+    isConnectedGlobal = false;
+    listeners.forEach((listener) => listener(lastTickers, isConnectedGlobal));
+    socket = null;
+  };
+
+  socket.onerror = (error) => {
+    console.error("WebSocket Error:", error);
+    isConnectedGlobal = false;
+    listeners.forEach((listener) => listener(lastTickers, isConnectedGlobal));
+    socket?.close();
+  };
+};
+
+const manageSubscriptions = (symbols: string[]) => {
+  const newSymbols = new Set(symbols);
+
+  const symbolsToUnsubscribe = [...currentSubscriptions].filter(
+    (s) => !newSymbols.has(s)
+  );
+  const symbolsToSubscribe = [...newSymbols].filter(
+    (s) => !currentSubscriptions.has(s)
+  );
+
+  if (socket?.readyState === WebSocket.OPEN) {
+    if (symbolsToUnsubscribe.length > 0) {
+      const params = symbolsToUnsubscribe.map(
+        (s) => `${s.toLowerCase()}@ticker`
+      );
+      socket.send(JSON.stringify({ method: "UNSUBSCRIBE", params, id: 2 }));
+      symbolsToUnsubscribe.forEach((s) => delete lastTickers[s]);
+    }
+    if (symbolsToSubscribe.length > 0) {
+      const params = symbolsToSubscribe.map((s) => `${s.toLowerCase()}@ticker`);
+      socket.send(JSON.stringify({ method: "SUBSCRIBE", params, id: 1 }));
+    }
+  }
+
+  currentSubscriptions = newSymbols;
+};
+
+export const useBinanceSocket = (watchlist: string[]) => {
+  const [tickers, setTickers] =
+    useState<Record<string, TickerData>>(lastTickers);
+  const [isConnected, setIsConnected] = useState<boolean>(isConnectedGlobal);
+
   useEffect(() => {
-    const ws = new WebSocket(WEBSOCKET_URL);
-    socketRef.current = ws;
-
-    ws.onopen = () => setIsConnected(true);
-    ws.onclose = () => setIsConnected(false);
-    ws.onerror = (error) => console.error("WebSocket Error:", error);
-
-    ws.onmessage = (event) => {
-      const message = JSON.parse(event.data);
-      if (message && message.s) {
-        const data: BinanceSocketData = message;
-        setTickers((prev) => ({
-          ...prev,
-          [data.s]: {
-            symbol: data.s,
-            lastPrice: parseFloat(data.c).toFixed(2),
-            priceChangePercent: parseFloat(data.P).toFixed(2),
-          },
-        }));
-      }
+    const componentListener = (
+      newTickers: Record<string, TickerData>,
+      newConnectionState: boolean
+    ) => {
+      setTickers(() => ({ ...newTickers }));
+      setIsConnected(newConnectionState);
     };
 
-    // Cleanup on component unmount
+    listeners.add(componentListener);
+    connectSocket();
+
     return () => {
-      ws.close();
+      listeners.delete(componentListener);
     };
-  }, []); // <-- Empty dependency array is CRITICAL for a single, stable connection.
+  }, []);
 
-  // Effect for Subscription Management: Runs whenever symbols or connection status change.
   useEffect(() => {
-    const ws = socketRef.current;
-    if (!ws || !isConnected) return;
-
-    // Logic to subscribe to new symbols and unsubscribe from old ones
-    const subscribedSymbols = new Set(Object.keys(tickers));
-    const newSymbols = symbols.filter((s) => !subscribedSymbols.has(s));
-    const oldSymbols = [...subscribedSymbols].filter(
-      (s) => !symbols.includes(s)
-    );
-
-    if (newSymbols.length > 0) {
-      const params = newSymbols.map((s) => `${s.toLowerCase()}@ticker`);
-      ws.send(
-        JSON.stringify({
-          method: "SUBSCRIBE",
-          params,
-          id: subscriptionIdCounter++,
-        })
-      );
-    }
-
-    if (oldSymbols.length > 0) {
-      const params = oldSymbols.map((s) => `${s.toLowerCase()}@ticker`);
-      ws.send(
-        JSON.stringify({
-          method: "UNSUBSCRIBE",
-          params,
-          id: subscriptionIdCounter++,
-        })
-      );
-
-      // Also remove from the displayed tickers immediately
-      setTickers((prev) => {
-        const newState = { ...prev };
-        oldSymbols.forEach((s) => delete newState[s]);
-        return newState;
-      });
-    }
-  }, [symbols, isConnected, tickers]);
+    manageSubscriptions(watchlist);
+  }, [watchlist]);
 
   return { tickers, isConnected };
 };

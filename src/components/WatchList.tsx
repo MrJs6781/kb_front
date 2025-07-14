@@ -26,10 +26,8 @@ const WatchList = () => {
 
   return (
     <section className="bg-surface p-4 rounded-lg shadow-sm sticky top-[70px]">
-      {/* هدر واچ‌لیست */}
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold text-foreground">واچ لیست</h2>
-        {/* نمایش وضعیت اتصال */}
         <div className="flex items-center gap-2">
           <span
             className={`text-xs font-semibold ${
@@ -103,7 +101,6 @@ const WatchList = () => {
           })}
         </div>
       ) : (
-        // حالتی که واچ‌لیست خالی است
         <div className="flex items-center justify-center h-48 bg-slate-50 rounded-lg">
           <div className="text-center">
             <h3 className="text-foreground font-semibold">
