@@ -21,48 +21,15 @@ export const useBinanceSocket = (symbols: string[]) => {
   const [tickers, setTickers] = useState<Record<string, TickerData>>({});
   const [isConnected, setIsConnected] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
-  const subscribedSymbolsRef = useRef<Set<string>>(new Set());
 
-  const manageSubscriptions = useCallback(
-    (
-      ws: WebSocket,
-      symbolsToManage: string[],
-      method: "SUBSCRIBE" | "UNSUBSCRIBE"
-    ) => {
-      if (symbolsToManage.length === 0) return;
-
-      const params = symbolsToManage.map((s) => `${s.toLowerCase()}@ticker`);
-      ws.send(JSON.stringify({ method, params, id: subscriptionIdCounter++ }));
-
-      symbolsToManage.forEach((s) => {
-        if (method === "SUBSCRIBE") {
-          subscribedSymbolsRef.current.add(s);
-        } else {
-          subscribedSymbolsRef.current.delete(s);
-          // Also remove from the displayed tickers
-          setTickers((prev) => {
-            const newState = { ...prev };
-            delete newState[s];
-            return newState;
-          });
-        }
-      });
-    },
-    []
-  );
-
+  // Effect for Connection Management: Runs ONLY ONCE on mount/unmount.
   useEffect(() => {
     const ws = new WebSocket(WEBSOCKET_URL);
     socketRef.current = ws;
 
-    ws.onopen = () => {
-      setIsConnected(true);
-      // Subscribe to initial symbols
-      const newSymbols = symbols.filter(
-        (s) => !subscribedSymbolsRef.current.has(s)
-      );
-      manageSubscriptions(ws, newSymbols, "SUBSCRIBE");
-    };
+    ws.onopen = () => setIsConnected(true);
+    ws.onclose = () => setIsConnected(false);
+    ws.onerror = (error) => console.error("WebSocket Error:", error);
 
     ws.onmessage = (event) => {
       const message = JSON.parse(event.data);
@@ -79,30 +46,53 @@ export const useBinanceSocket = (symbols: string[]) => {
       }
     };
 
-    ws.onerror = (error) => console.error("WebSocket Error:", error);
-    ws.onclose = () => setIsConnected(false);
-
-    // This is the cleanup function that runs when the component unmounts.
+    // Cleanup on component unmount
     return () => {
       ws.close();
     };
-  }, []); // Empty dependency array ensures this effect runs only once.
+  }, []); // <-- Empty dependency array is CRITICAL for a single, stable connection.
 
+  // Effect for Subscription Management: Runs whenever symbols or connection status change.
   useEffect(() => {
     const ws = socketRef.current;
     if (!ws || !isConnected) return;
 
-    const currentSymbolsSet = new Set(symbols);
-    const toUnsubscribe = [...subscribedSymbolsRef.current].filter(
-      (s) => !currentSymbolsSet.has(s)
-    );
-    const toSubscribe = [...currentSymbolsSet].filter(
-      (s) => !subscribedSymbolsRef.current.has(s)
+    // Logic to subscribe to new symbols and unsubscribe from old ones
+    const subscribedSymbols = new Set(Object.keys(tickers));
+    const newSymbols = symbols.filter((s) => !subscribedSymbols.has(s));
+    const oldSymbols = [...subscribedSymbols].filter(
+      (s) => !symbols.includes(s)
     );
 
-    manageSubscriptions(ws, toUnsubscribe, "UNSUBSCRIBE");
-    manageSubscriptions(ws, toSubscribe, "SUBSCRIBE");
-  }, [symbols, isConnected, manageSubscriptions]);
+    if (newSymbols.length > 0) {
+      const params = newSymbols.map((s) => `${s.toLowerCase()}@ticker`);
+      ws.send(
+        JSON.stringify({
+          method: "SUBSCRIBE",
+          params,
+          id: subscriptionIdCounter++,
+        })
+      );
+    }
+
+    if (oldSymbols.length > 0) {
+      const params = oldSymbols.map((s) => `${s.toLowerCase()}@ticker`);
+      ws.send(
+        JSON.stringify({
+          method: "UNSUBSCRIBE",
+          params,
+          id: subscriptionIdCounter++,
+        })
+      );
+
+      // Also remove from the displayed tickers immediately
+      setTickers((prev) => {
+        const newState = { ...prev };
+        oldSymbols.forEach((s) => delete newState[s]);
+        return newState;
+      });
+    }
+  }, [symbols, isConnected]);
 
   return { tickers, isConnected };
 };
