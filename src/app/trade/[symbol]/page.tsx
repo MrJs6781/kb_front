@@ -36,8 +36,12 @@ const TradePage = () => {
       }
       const data: Trade[] = await response.json();
       setTrades(data.reverse()); // Show latest trades first
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      if (e instanceof Error) {
+        setError(e.message);
+      } else {
+        setError("An unknown error occurred");
+      }
     } finally {
       setLoading(false);
     }

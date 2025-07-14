@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 export interface TickerData {
   symbol: string;
@@ -24,7 +24,46 @@ export const useBinanceSocket = (symbols: string[]) => {
   const subscribedSymbolsRef = useRef<Set<string>>(new Set());
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const connect = () => {
+  const updateSubscriptions = useCallback((currentSymbols: string[]) => {
+    const ws = socketRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    const currentSymbolsSet = new Set(currentSymbols);
+    const toUnsubscribe = [...subscribedSymbolsRef.current].filter(
+      (s) => !currentSymbolsSet.has(s)
+    );
+    const toSubscribe = [...currentSymbolsSet].filter(
+      (s) => !subscribedSymbolsRef.current.has(s)
+    );
+
+    if (toUnsubscribe.length > 0) {
+      const params = toUnsubscribe.map((s) => `${s.toLowerCase()}@ticker`);
+      ws.send(
+        JSON.stringify({
+          method: "UNSUBSCRIBE",
+          params,
+          id: subscriptionIdCounter++,
+        })
+      );
+      toUnsubscribe.forEach((s) => subscribedSymbolsRef.current.delete(s));
+    }
+
+    if (toSubscribe.length > 0) {
+      const params = toSubscribe.map((s) => `${s.toLowerCase()}@ticker`);
+      ws.send(
+        JSON.stringify({
+          method: "SUBSCRIBE",
+          params,
+          id: subscriptionIdCounter++,
+        })
+      );
+      toSubscribe.forEach((s) => subscribedSymbolsRef.current.add(s));
+    }
+  }, []);
+
+  const connect = useCallback(() => {
     if (socketRef.current) {
       // A connection is already open or being established
       return;
@@ -79,64 +118,28 @@ export const useBinanceSocket = (symbols: string[]) => {
       socketRef.current = null; // Clear the ref to allow reconnection
       setTimeout(connect, 5000); // Reconnect after 5 seconds
     };
-  };
-
-  const updateSubscriptions = (currentSymbols: string[]) => {
-    const ws = socketRef.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      return;
-    }
-
-    const currentSymbolsSet = new Set(currentSymbols);
-    const toUnsubscribe = [...subscribedSymbolsRef.current].filter(
-      (s) => !currentSymbolsSet.has(s)
-    );
-    const toSubscribe = [...currentSymbolsSet].filter(
-      (s) => !subscribedSymbolsRef.current.has(s)
-    );
-
-    if (toUnsubscribe.length > 0) {
-      const params = toUnsubscribe.map((s) => `${s.toLowerCase()}@ticker`);
-      ws.send(
-        JSON.stringify({
-          method: "UNSUBSCRIBE",
-          params,
-          id: subscriptionIdCounter++,
-        })
-      );
-      toUnsubscribe.forEach((s) => subscribedSymbolsRef.current.delete(s));
-    }
-
-    if (toSubscribe.length > 0) {
-      const params = toSubscribe.map((s) => `${s.toLowerCase()}@ticker`);
-      ws.send(
-        JSON.stringify({
-          method: "SUBSCRIBE",
-          params,
-          id: subscriptionIdCounter++,
-        })
-      );
-      toSubscribe.forEach((s) => subscribedSymbolsRef.current.add(s));
-    }
-  };
+  }, [symbols, updateSubscriptions]);
 
   useEffect(() => {
-    if (!socketRef.current) {
-      connect();
-    } else {
-      updateSubscriptions(symbols);
-    }
+    connect();
 
     // Cleanup on component unmount
     return () => {
       if (socketRef.current) {
+        // We close the socket on unmount, not on symbol change
+        socketRef.current.onclose = null; // Prevent reconnection logic from firing on unmount
         socketRef.current.close();
       }
       if (heartbeatIntervalRef.current) {
         clearInterval(heartbeatIntervalRef.current);
       }
     };
-  }, [symbols]);
+  }, [connect]);
+
+  // Effect to handle subscription updates when symbols change
+  useEffect(() => {
+    updateSubscriptions(symbols)
+  }, [symbols, updateSubscriptions])
 
   return { tickers, isConnected };
 };
