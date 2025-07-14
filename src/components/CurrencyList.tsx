@@ -3,9 +3,9 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useWatchlist } from "@/context/WatchlistContext";
-import CryptoIcon from "./CryptoIcon"; // Using the new robust component
+import CryptoIcon from "./CryptoIcon";
+import { FiCheckCircle } from "react-icons/fi"; // آیکون برای نشان دادن اضافه شدن
 
-// A predefined list of popular currency pairs
 const ALL_CURRENCIES = [
   "BTCUSDT",
   "ETHUSDT",
@@ -21,7 +21,7 @@ const ALL_CURRENCIES = [
   "AVAXUSDT",
   "SHIBUSDT",
   "LINKUSDT",
-  "UNIUSDT", // Added more coins
+  "UNIUSDT",
 ];
 
 const CurrencyList = () => {
@@ -33,50 +33,69 @@ const CurrencyList = () => {
   );
 
   return (
-    <section className="p-1">
-      <h2 className="text-xl font-bold mb-4 text-slate-800">لیست ارزها</h2>
-      <div className="mb-4 sticky top-[80px] z-40">
+    <section>
+      <h2 className="text-2xl font-bold mb-4 text-foreground">لیست ارزها</h2>
+      <div className="mb-6 sticky top-[70px] z-40 py-2 bg-white/80 backdrop-blur-sm">
         <input
           type="text"
           placeholder="جستجوی نام ارز..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full px-4 py-3 bg-white rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          className="w-full px-4 py-3 bg-surface rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-primary"
         />
       </div>
-      <div className="space-y-2">
+
+      {/* استفاده از گرید برای نمایش کارتی */}
+      <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4">
         {filteredCurrencies.length > 0 ? (
           filteredCurrencies.map((currency) => {
             const isInWatchlist = isSymbolInWatchlist(currency);
             return (
               <div
                 key={currency}
-                className="flex items-center justify-between p-4 bg-white rounded-lg shadow-sm hover:shadow-md hover:-translate-y-px transition-all duration-200"
+                className="relative bg-gradient-to-br from-white to-slate-50 rounded-xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col p-4"
               >
-                <div className="flex items-center gap-3">
-                  <CryptoIcon symbol={currency} width={28} height={28} />
-                  <span className="font-bold text-slate-700">{currency}</span>
+                {/* نشانگر اضافه شدن به واچ‌لیست */}
+                {isInWatchlist && (
+                  <div className="absolute top-3 right-3 text-success">
+                    <FiCheckCircle size={20} />
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3 mb-4">
+                  <CryptoIcon symbol={currency} width={40} height={40} />
+                  <span className="font-bold text-lg text-foreground">
+                    {currency}
+                  </span>
                 </div>
-                <div className="flex items-center space-x-3 space-x-reverse gap-3">
+
+                <div className="mt-auto flex items-center gap-2">
                   <button
                     onClick={() => addToWatchlist(currency)}
                     disabled={isInWatchlist}
-                    className="px-4 py-2 text-sm font-semibold text-white bg-primary rounded-md hover:bg-primary-hover transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed"
+                    className={`w-full btn text-xs ${
+                      isInWatchlist
+                        ? "bg-emerald-50 text-success cursor-default"
+                        : "btn-primary"
+                    }`}
                   >
-                    {isInWatchlist ? "اضافه شد" : "افزودن"}
+                    {isInWatchlist ? "اضافه شد" : "افزودن به واچ‌لیست"}
                   </button>
-                  <Link href={`/trade/${currency.toLowerCase()}`}>
-                    <p className="block px-4 py-2 text-sm font-semibold text-primary bg-blue-100 rounded-md hover:bg-blue-200 transition-colors">
-                      مشاهده تریدها
-                    </p>
+                  <Link
+                    href={`/trade/${currency.toLowerCase()}`}
+                    className="w-full btn bg-slate-200 text-slate-800 hover:bg-slate-300 text-sm"
+                  >
+                    مشاهده تریدها
                   </Link>
                 </div>
               </div>
             );
           })
         ) : (
-          <div className="text-center text-slate-500 py-10 bg-white rounded-lg shadow-sm">
-            <p>ارزی با این مشخصات یافت نشد.</p>
+          <div className="col-span-full text-center py-10 bg-surface rounded-lg shadow-sm">
+            <p className="text-muted-foreground">
+              ارزی با این مشخصات یافت نشد.
+            </p>
           </div>
         )}
       </div>

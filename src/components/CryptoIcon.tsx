@@ -1,43 +1,38 @@
-'use client';
-
-import React, { useState } from 'react';
-import Image from 'next/image';
+import React from "react";
+import Image from "next/image";
+import { cryptoIconMap, fallbackIcon } from "@/lib/cryptoIcons";
 
 interface CryptoIconProps {
-  symbol: string;
-  width: number;
-  height: number;
-  className?: string;
+  symbol: string; // نماد کامل ارز، مانند "BTCUSDT"
+  width?: number;
+  height?: number;
 }
 
-const getIconSymbol = (pair: string) => {
-    return pair.replace(/USDT$/, '').toLowerCase();
-}
+/**
+ * این کامپوننت یک آیکون برای یک ارز دیجیتال نمایش می‌دهد.
+ * اگر آیکون اختصاصی برای ارز وجود داشته باشد، آن را نمایش می‌دهد، در غیر این صورت از یک آیکون پیش‌فرض استفاده می‌کند.
+ */
+const CryptoIcon: React.FC<CryptoIconProps> = ({
+  symbol,
+  width = 32,
+  height = 32,
+}) => {
+  // استخراج نام اصلی ارز از نماد کامل (مثلا 'BTC' از 'BTCUSDT')
+  // این یک پیاده‌سازی ساده است، می‌توان آن را برای پشتیبانی از ارزهای دیگر مانند BUSD و ... کامل‌تر کرد.
+  const baseCurrency = symbol.replace(/USDT$/, "");
 
-const CryptoIcon: React.FC<CryptoIconProps> = ({ symbol, ...props }) => {
-  const iconSymbol = getIconSymbol(symbol);
-  
-  // Using a more reliable CDN
-  const initialSrc = `https://cryptoicons.co/svg/color/${iconSymbol}.svg`;
-  
-  // A simple, generic placeholder SVG used as a fallback
-  const fallbackSrc = `data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NSIgZmlsbD0iI2UyZThmMCIgLz48dGV4dCB4PSI1MCIgeT0iNjgiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjUwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOTRhM2I4Ij4/PC90ZXh0Pjwvc3ZnPg==`;
-
-  const [imgSrc, setImgSrc] = useState(initialSrc);
+  // پیدا کردن آیکون مربوطه از دیکشنری یا استفاده از آیکون پیش‌فرض
+  const iconSrc = cryptoIconMap[baseCurrency] || fallbackIcon;
 
   return (
     <Image
-      src={imgSrc}
+      src={iconSrc}
       alt={`${symbol} icon`}
-      unoptimized
-      onError={() => {
-        if(imgSrc !== fallbackSrc) {
-            setImgSrc(fallbackSrc);
-        }
-      }}
-      {...props}
+      width={width}
+      height={height}
+      className="rounded-full" // برای نمایش بهتر آیکون‌ها
     />
   );
 };
 
-export default CryptoIcon; 
+export default CryptoIcon;

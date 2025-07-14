@@ -2,15 +2,14 @@
 
 import React, { useEffect, useRef } from "react";
 import { useWatchlist } from "@/context/WatchlistContext";
-import { useBinanceSocket } from "@/hooks/useBinanceSocket"; // Replaced with the new hook
+import { useBinanceSocket } from "@/hooks/useBinanceSocket";
 import { FiTrash2 } from "react-icons/fi";
-import CryptoIcon from "./CryptoIcon"; // Using the new robust component
+import CryptoIcon from "./CryptoIcon";
 
 const WatchList = () => {
   const { watchlist, removeFromWatchlist } = useWatchlist();
-  const { tickers, isConnected } = useBinanceSocket(watchlist); // Using the new hook
+  const { tickers, isConnected } = useBinanceSocket(watchlist);
 
-  // State to track price changes for visual feedback
   const prevTickersRef = useRef<typeof tickers>({});
   useEffect(() => {
     prevTickersRef.current = tickers;
@@ -26,10 +25,12 @@ const WatchList = () => {
   };
 
   return (
-    <section className="bg-white p-4 rounded-lg shadow-sm sticky top-[80px]">
+    <section className="bg-surface p-4 rounded-lg shadow-sm sticky top-[70px]">
+      {/* هدر واچ‌لیست */}
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold text-slate-800">واچ لیست</h2>
-        <div className="flex items-center space-x-2 space-x-reverse">
+        <h2 className="text-xl font-bold text-foreground">واچ لیست</h2>
+        {/* نمایش وضعیت اتصال */}
+        <div className="flex items-center gap-2">
           <span
             className={`text-xs font-semibold ${
               isConnected ? "text-success" : "text-danger"
@@ -46,16 +47,17 @@ const WatchList = () => {
       </div>
 
       {watchlist.length > 0 ? (
-        <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+        <div className="space-y-3 max-h-[calc(100vh-150px)] overflow-y-auto">
           {watchlist.map((symbol) => {
             const data = tickers[symbol];
             const changeDirection = getPriceChangeDirection(symbol);
+
             const priceColorClass =
               changeDirection === "up"
                 ? "text-success"
                 : changeDirection === "down"
                 ? "text-danger"
-                : "text-slate-700";
+                : "text-foreground";
 
             const changeColorClass =
               data && parseFloat(data.priceChangePercent) >= 0
@@ -65,48 +67,49 @@ const WatchList = () => {
             return (
               <div
                 key={symbol}
-                className="flex items-center justify-between p-3 bg-slate-50 rounded-lg"
+                className="flex items-center justify-between p-2 hover:bg-slate-50 rounded-md transition-colors"
               >
-                <div className="flex-1 flex items-center gap-3">
-                  <CryptoIcon symbol={symbol} width={24} height={24} />
-                  <span className="font-bold text-slate-700">{symbol}</span>
+                <div className="flex items-center gap-3">
+                  <CryptoIcon symbol={symbol} width={28} height={28} />
+                  <span className="font-semibold text-foreground text-sm">
+                    {symbol}
+                  </span>
                 </div>
                 {data ? (
-                  <div className="flex-1 text-center" dir="ltr">
+                  <div className="text-left font-mono" dir="ltr">
                     <p
-                      className={`font-mono font-semibold transition-colors duration-300 ${priceColorClass}`}
+                      className={`font-semibold transition-colors duration-200 ${priceColorClass}`}
                     >
                       ${data.lastPrice}
                     </p>
-                    <p className={`text-sm font-mono ${changeColorClass}`}>
+                    <p className={`text-xs ${changeColorClass}`}>
                       {data.priceChangePercent}%
                     </p>
                   </div>
                 ) : (
-                  <div className="flex-1 text-center text-slate-400 text-sm animate-pulse">
-                    در حال اتصال...
+                  <div className="text-muted-foreground text-sm animate-pulse">
+                    ...
                   </div>
                 )}
-                <div className="flex-1 flex justify-end">
-                  <button
-                    onClick={() => removeFromWatchlist(symbol)}
-                    className="text-slate-500 hover:text-danger p-2 rounded-full transition-colors"
-                    aria-label={`Remove ${symbol} from watchlist`}
-                  >
-                    <FiTrash2 size={18} />
-                  </button>
-                </div>
+                <button
+                  onClick={() => removeFromWatchlist(symbol)}
+                  className="text-muted-foreground hover:text-danger p-2 rounded-full transition-colors"
+                  aria-label={`حذف ${symbol} از واچ‌لیست`}
+                >
+                  <FiTrash2 size={16} />
+                </button>
               </div>
             );
           })}
         </div>
       ) : (
+        // حالتی که واچ‌لیست خالی است
         <div className="flex items-center justify-center h-48 bg-slate-50 rounded-lg">
           <div className="text-center">
-            <h3 className="text-slate-700 font-semibold">
+            <h3 className="text-foreground font-semibold">
               واچ لیست شما خالی است
             </h3>
-            <p className="text-slate-500 text-sm mt-1">
+            <p className="text-muted-foreground text-sm mt-1">
               ارزهای مورد علاقه خود را اضافه کنید.
             </p>
           </div>
